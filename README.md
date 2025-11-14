@@ -16,18 +16,14 @@ AI-powered React Native + Python app that identifies landmarks and monuments fro
 ```
 geogenie/
 ├── backend/          # FastAPI Python server
-│   ├── main.py       # FastAPI app with endpoints
-│   ├── embed_generator.py  # CLIP embedding extraction
-│   ├── build_db.py   # Build reference embeddings database
-│   ├── search_image.py     # FAISS similarity search
-│   ├── exif_utils.py       # GPS metadata extraction
-│   ├── geocode.py    # Reverse geocoding
-│   └── requirements.txt
-│
-└── frontend/         # React Native Expo app
-    ├── app/          # Screen components
-    ├── services/     # API client
-    └── utils/        # Utilities
+    ├── main.py       # FastAPI app with endpoints
+    ├── embed_generator.py  # CLIP embedding extraction
+    ├── build_db.py   # Build reference embeddings database
+    ├── search_image.py     # FAISS similarity search
+    ├── exif_utils.py       # GPS metadata extraction
+    ├── geocode.py    # Reverse geocoding
+    └── requirements.txt
+
 ```
 
 ## Quick Start
@@ -63,34 +59,6 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 The API will be available at `http://localhost:8000`
 API documentation at `http://localhost:8000/docs`
 
-### Frontend Setup
-
-1. **Navigate to frontend directory:**
-```bash
-cd frontend
-```
-
-2. **Install dependencies:**
-```bash
-npm install
-# or
-yarn install
-```
-
-3. **Update API URL (if needed):**
-Edit `frontend/services/api.ts` and update `API_BASE_URL` if your backend runs on a different host/port.
-
-4. **Start Expo:**
-```bash
-npm start
-# or
-yarn start
-```
-
-5. **Run on device/emulator:**
-- Press `a` for Android emulator
-- Press `i` for iOS simulator
-- Scan QR code with Expo Go app on your physical device
 
 ## API Endpoints
 
@@ -142,7 +110,7 @@ Get place information from Wikipedia.
 1. **GPS-First Approach**: If GPS coordinates are available (from EXIF or live location), the app uses reverse geocoding via OpenStreetMap Nominatim API.
 
 2. **Visual Fallback**: If GPS is unavailable or doesn't yield a landmark, the app:
-   - Extracts CLIP embeddings from the image
+   - Extracts CLIP/DinoV2 embeddings from the image
    - Searches against a FAISS database of reference landmarks
    - Returns the best match with confidence score
 
@@ -177,12 +145,6 @@ Or modify `build_db.py` to load from your own data source.
 - Pillow for image processing and EXIF extraction
 - FastAPI with automatic OpenAPI documentation
 
-### Frontend
-- Expo Router for navigation
-- TypeScript for type safety
-- AsyncStorage for caching results
-- Material Design-inspired dark theme
-
 ### Future Enhancements
 - On-device CLIP inference using ONNX Runtime Mobile
 - Local SQLite database for top 500 landmarks (offline mode)
@@ -190,23 +152,5 @@ Or modify `build_db.py` to load from your own data source.
 - Batch processing for multiple images
 - User-contributed landmark database
 
-## Troubleshooting
 
-### Backend Issues
-- **Model download slow**: CLIP model (~500MB) downloads on first run
-- **FAISS errors**: Ensure `data/` directory exists and is writable
-- **Geocoding rate limits**: Nominatim allows 1 request/second (rate limiting implemented)
-
-### Frontend Issues
-- **API connection failed**: Check that backend is running and `API_BASE_URL` is correct
-- **Camera not working**: Ensure camera permissions are granted
-- **Location not available**: Check location permissions in device settings
-
-## License
-
-MIT License - feel free to use and modify for your projects!
-
-## Contributing
-
-Contributions welcome! Please feel free to submit issues or pull requests.
 
