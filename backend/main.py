@@ -29,8 +29,9 @@ from exif_utils import extract_gps_from_bytes
 from geocode import get_geocoder
 from ai_client import call_gemini
 
+
 # ---------------------------------------------------
-# PROPER DB DEPENDENCY (FIXES local_kw BUG)
+# Proper DB dependency
 # ---------------------------------------------------
 def get_db():
     db = SessionLocal()
@@ -38,6 +39,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 # ---------------------------------------------------
 # FastAPI Init
@@ -51,6 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ---------------------------------------------------
 # Pydantic Models
@@ -78,6 +81,7 @@ async def startup_event():
 
     Base.metadata.create_all(bind=engine)
 
+    # Ensure landmark folder exists and sync with DB
     base_landmarks = crud.LANDMARKS_DIR
     ensure_folder(base_landmarks)
 
@@ -97,7 +101,7 @@ async def startup_event():
 
 
 # ---------------------------------------------------
-# Root
+# Root / Debug
 # ---------------------------------------------------
 @app.get("/")
 async def root():
@@ -113,6 +117,7 @@ async def debug_routes():
         ]
     }
 
+
 # ---------------------------------------------------
 # Landmark Recognition
 # ---------------------------------------------------
@@ -126,7 +131,7 @@ async def recognize_landmark(
         img_bytes = await image.read()
         img_pil = Image.open(io.BytesIO(img_bytes))
 
-        # Try GPS
+        # GPS if provided or from EXIF
         gps = (latitude, longitude) if latitude and longitude else extract_gps_from_bytes(img_bytes)
 
         if gps:
@@ -140,6 +145,7 @@ async def recognize_landmark(
                     coordinates=list(gps),
                 )
 
+        # Visual (CLIP + FAISS)
         embedder = get_embedder()
         search = get_search_engine()
 
@@ -166,7 +172,7 @@ async def recognize_landmark(
 
 
 # ---------------------------------------------------
-# List Landmarks (DB)
+# Landmarks — DB List
 # ---------------------------------------------------
 @app.get("/landmarks")
 async def list_landmarks(db: Session = Depends(get_db)):
@@ -191,21 +197,29 @@ async def add_landmark(
         ensure_folder(os.path.join(crud.LANDMARKS_DIR, norm))
         landmark = crud.create_landmark(db, norm, description)
 
-        return {"status": "created", "landmark": {"id": landmark.id, "name": landmark.name}}
+        return {
+            "status": "created",
+            "landmark": {
+                "id": landmark.id,
+                "name": landmark.name,
+            },
+        }
 
     except Exception as e:
         raise HTTPException(500, str(e))
 
 
 # ---------------------------------------------------
-# List Folder Landmarks
+# List Folder-based Landmarks
 # ---------------------------------------------------
 @app.get("/landmarks/list")
 async def list_landmark_folders():
     base = crud.LANDMARKS_DIR
     ensure_folder(base)
 
-    entries = sorted([d for d in os.listdir(base) if os.path.isdir(os.path.join(base, d))])
+    entries = sorted(
+        [d for d in os.listdir(base) if os.path.isdir(os.path.join(base, d))]
+    )
     if "unknown" not in entries:
         entries.append("unknown")
 
@@ -214,6 +228,7 @@ async def list_landmark_folders():
 
 # ---------------------------------------------------
 # FEEDBACK UPLOAD (image + optional metadata)
+# This ALWAYS saves the image, even for existing landmarks.
 # ---------------------------------------------------
 @app.post("/feedback/upload")
 async def upload_feedback(
@@ -226,38 +241,68 @@ async def upload_feedback(
     db: Session = Depends(get_db),
 ):
     try:
-        # Resolve landmark
+        # ---------------------------
+        # Resolve or create landmark
+        # ---------------------------
         if landmark_id:
             landmark = crud.get_landmark(db, landmark_id)
             if not landmark:
-                raise HTTPException(404, "Landmark not found")
+                raise HTTPException(404, "❌ Landmark not found")
         else:
             norm = normalize_name(landmark_name) if landmark_name else "unknown"
-            landmark = crud.get_landmark_by_name(db, norm) or crud.create_landmark(db, norm, description)
+            landmark = crud.get_landmark_by_name(db, norm)
+            if not landmark:
+                landmark = crud.create_landmark(db, norm, description)
+                print(f"🆕 Created landmark: {landmark.name}")
+            else:
+                print(f"📍 Using existing landmark: {landmark.name}")
 
-        filename, saved_path = crud.save_uploaded_file_to_landmark(landmark.name, file)
+        # ---------------------------
+        # ALWAYS save image
+        # ---------------------------
+        filename, saved_path = crud.save_uploaded_file_to_landmark(
+            landmark.name, file
+        )
         img_record = crud.save_landmark_image(db, landmark, filename)
+        print(f"💾 Saved image '{filename}' under '{landmark.name}'")
 
+        # ---------------------------
+        # Parse coords
+        # ---------------------------
         try:
             lat_val = float(latitude) if latitude not in (None, "", "null") else None
             lng_val = float(longitude) if longitude not in (None, "", "null") else None
-        except:
-            lat_val = lng_val = None
+        except Exception:
+            lat_val = None
+            lng_val = None
 
-        embedder = get_embedder()
-        search = get_search_engine()
+        # ---------------------------
+        # Update FAISS
+        # ---------------------------
+        try:
+            embedder = get_embedder()
+            search = get_search_engine()
 
-        pil_img = Image.open(saved_path).convert("RGB")
-        emb = embedder.generate_embedding(pil_img)
+            pil_img = Image.open(saved_path).convert("RGB")
+            emb = embedder.generate_embedding(pil_img)
 
-        search.add_landmark(embedding=emb, place_name=landmark.name, image_path=saved_path)
+            search.add_landmark(
+                embedding=emb,
+                place_name=landmark.name,
+                image_path=saved_path,
+            )
+
+            print(f"🧠 FAISS: added embedding for '{landmark.name}'")
+
+        except Exception as e:
+            print("⚠ FAISS embedding failed:", e)
 
         return {
             "status": "success",
             "landmark_id": landmark.id,
             "image_id": img_record.id,
             "filename": filename,
-            "coordinates": [lat_val, lng_val] if lat_val and lng_val else None,
+            "coordinates": [lat_val, lng_val] if (lat_val and lng_val) else None,
         }
 
     except Exception as e:
@@ -265,7 +310,8 @@ async def upload_feedback(
 
 
 # ---------------------------------------------------
-# FEEDBACK META (metadata-only, AFTER upload)
+# FEEDBACK META (metadata AFTER upload)
+# Updates landmark association, moves file, re-embeds.
 # ---------------------------------------------------
 @app.post("/feedback/meta")
 async def update_feedback_meta(
@@ -282,54 +328,82 @@ async def update_feedback_meta(
             raise HTTPException(404, "Image not found")
 
         current_landmark = crud.get_landmark(db, img.landmark_id)
+        if not current_landmark:
+            raise HTTPException(404, "Current landmark not found")
 
+        # Determine target landmark
         if landmark_name:
             norm = normalize_name(landmark_name)
-            new_landmark = crud.get_landmark_by_name(db, norm) or crud.create_landmark(db, norm, description)
+            new_landmark = crud.get_landmark_by_name(db, norm)
+            if not new_landmark:
+                new_landmark = crud.create_landmark(db, norm, description)
+                print(f"🆕 Created landmark via /meta: {new_landmark.name}")
         else:
             new_landmark = current_landmark
 
-        old_path = os.path.join(crud.LANDMARKS_DIR, current_landmark.name, img.filename)
+        # Paths
+        old_path = os.path.join(
+            crud.LANDMARKS_DIR, current_landmark.name, img.filename
+        )
         new_folder = crud.ensure_landmark_folder(new_landmark.name)
         new_path = os.path.join(new_folder, img.filename)
 
+        # Move file if path changed
         if old_path != new_path and os.path.exists(old_path):
-            move_image(old_path, new_folder)
+            moved_path = move_image(old_path, new_folder)
+            print(f"📦 Moved image: {old_path} -> {moved_path}")
+            new_path = moved_path  # use real path returned
+        else:
+            print("↪ No move needed (path same or file missing)")
 
+        # Update DB
         img.landmark_id = new_landmark.id
 
-        if hasattr(img, "description") and description:
+        if hasattr(img, "description") and description is not None:
             img.description = description
 
         try:
-            if hasattr(img, "latitude") and latitude:
+            if hasattr(img, "latitude") and latitude not in (None, "", "null"):
                 img.latitude = float(latitude)
-            if hasattr(img, "longitude") and longitude:
+            if hasattr(img, "longitude") and longitude not in (None, "", "null"):
                 img.longitude = float(longitude)
-        except:
+        except Exception:
             pass
 
         db.commit()
         db.refresh(img)
 
-        # Re-embed
+        # Re-embed FAISS for this image + place
         try:
             embedder = get_embedder()
             search = get_search_engine()
+
             pil_img = Image.open(new_path).convert("RGB")
             emb = embedder.generate_embedding(pil_img)
-            search.add_landmark(embedding=emb, place_name=new_landmark.name, image_path=new_path)
-        except Exception as e:
-            print("FAISS update failed:", e)
 
-        return {"status": "updated", "landmark": new_landmark.name, "image_id": img.id}
+            search.add_landmark(
+                embedding=emb,
+                place_name=new_landmark.name,
+                image_path=new_path,
+            )
+
+            print(f"🧠 FAISS updated for '{new_landmark.name}' via /meta")
+
+        except Exception as e:
+            print(f"⚠ Failed FAISS meta update: {e}")
+
+        return {
+            "status": "updated",
+            "landmark": new_landmark.name,
+            "image_id": img.id,
+        }
 
     except Exception as e:
         raise HTTPException(500, str(e))
 
 
 # ---------------------------------------------------
-# Move Image
+# Move Image (legacy helper)
 # ---------------------------------------------------
 @app.post("/feedback/move")
 async def move_feedback_image(
@@ -351,30 +425,45 @@ async def move_feedback_image(
 
 
 # ---------------------------------------------------
-# Place Info
+# Place Info (Wikipedia)
 # ---------------------------------------------------
 @app.get("/placeinfo/{name}", response_model=PlaceInfoResponse)
 async def get_place_info(name: str, use_ai_summary: bool = False):
     try:
         import requests
+
         url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{name.replace(' ', '_')}"
         r = requests.get(url, timeout=10)
 
         if r.status_code == 200:
             data = r.json()
             desc = data.get("extract", "")
-            link = data.get("content_urls", {}).get("desktop", {}).get("page", "")
+            link = (
+                data.get("content_urls", {})
+                .get("desktop", {})
+                .get("page", "")
+            )
             summary = desc.split("\n")[0] if use_ai_summary else None
-            return PlaceInfoResponse(name=name, description=desc, summary=summary, wikipedia_url=link)
 
-        return PlaceInfoResponse(name=name, description="Not found", summary=None, wikipedia_url=None)
+            return PlaceInfoResponse(
+                name=name,
+                description=desc,
+                summary=summary,
+                wikipedia_url=link,
+            )
 
+        return PlaceInfoResponse(
+            name=name,
+            description="Information not found.",
+            summary=None,
+            wikipedia_url=None,
+        )
     except Exception as e:
         raise HTTPException(500, str(e))
 
 
 # ---------------------------------------------------
-# Chat Place
+# Chat — HTML Output
 # ---------------------------------------------------
 @app.post("/chat/place")
 async def chat_place(
@@ -383,8 +472,12 @@ async def chat_place(
 ):
     try:
         system_prompt = f"""
-You are a helpful tour guide.
-Respond ONLY in valid HTML tags.
+You are a friendly and knowledgeable travel guide.
+Respond ONLY in valid HTML (no markdown, no JSON).
+Rules:
+- Use <p>, <strong>, <em>, <ul>, <li>.
+- No <html>, <body>, <head>.
+- Max 120 words.
 Topic: {name}
 """
         if user_message:
@@ -396,8 +489,9 @@ Topic: {name}
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
 # ---------------------------------------------------
-# Run
+# Run (local dev)
 # ---------------------------------------------------
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
