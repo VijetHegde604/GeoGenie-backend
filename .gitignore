@@ -210,3 +210,6 @@ __marimo__/
 # landmarks folder
 backend/landmarks/*
 /landmarks
+/scripts/test_augmented
+/scripts/landmarks
+/scripts/data
