@@ -8,26 +8,28 @@ Handles:
 - Landmark management
 """
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional
-from sqlalchemy.orm import Session
-from PIL import Image
-import os
 import io
+import os
+from typing import Optional
+
 import uvicorn
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+import crud
+import models
+from ai_client import call_gemini
 
 # Local imports
-from db import SessionLocal, engine, Base
-import models
-import crud
-from utils import normalize_name, ensure_folder, move_image, is_allowed_file
+from db import Base, SessionLocal, engine
 from embed_generator import get_embedder
-from search_image import get_search_engine
 from exif_utils import extract_gps_from_bytes
 from geocode import get_geocoder
-from ai_client import call_gemini
+from search_image import get_search_engine
+from utils import ensure_folder, is_allowed_file, move_image, normalize_name
 
 
 # ---------------------------------------------------
@@ -132,7 +134,11 @@ async def recognize_landmark(
         img_pil = Image.open(io.BytesIO(img_bytes))
 
         # GPS if provided or from EXIF
-        gps = (latitude, longitude) if latitude and longitude else extract_gps_from_bytes(img_bytes)
+        gps = (
+            (latitude, longitude)
+            if latitude and longitude
+            else extract_gps_from_bytes(img_bytes)
+        )
 
         if gps:
             geo = get_geocoder()
@@ -192,7 +198,10 @@ async def add_landmark(
         norm = normalize_name(name)
         existing = crud.get_landmark_by_name(db, norm)
         if existing:
-            return {"status": "exists", "landmark": {"id": existing.id, "name": existing.name}}
+            return {
+                "status": "exists",
+                "landmark": {"id": existing.id, "name": existing.name},
+            }
 
         ensure_folder(os.path.join(crud.LANDMARKS_DIR, norm))
         landmark = crud.create_landmark(db, norm, description)
@@ -260,9 +269,7 @@ async def upload_feedback(
         # ---------------------------
         # ALWAYS save image
         # ---------------------------
-        filename, saved_path = crud.save_uploaded_file_to_landmark(
-            landmark.name, file
-        )
+        filename, saved_path = crud.save_uploaded_file_to_landmark(landmark.name, file)
         img_record = crud.save_landmark_image(db, landmark, filename)
         print(f"💾 Saved image '{filename}' under '{landmark.name}'")
 
@@ -280,19 +287,22 @@ async def upload_feedback(
         # Update FAISS
         # ---------------------------
         try:
-            embedder = get_embedder()
-            search = get_search_engine()
+            if landmark.name == "unknown":
+                print("⏭ Skipping FAISS (unknown placeholder)")
+            else:
+                embedder = get_embedder()
+                search = get_search_engine()
 
-            pil_img = Image.open(saved_path).convert("RGB")
-            emb = embedder.generate_embedding(pil_img)
+                pil_img = Image.open(saved_path).convert("RGB")
+                emb = embedder.generate_embedding(pil_img)
 
-            search.add_landmark(
-                embedding=emb,
-                place_name=landmark.name,
-                image_path=saved_path,
-            )
+                search.add_landmark(
+                    embedding=emb,
+                    place_name=landmark.name,
+                    image_path=saved_path,
+                )
 
-            print(f"🧠 FAISS: added embedding for '{landmark.name}'")
+                print(f"🧠 FAISS: added embedding for '{landmark.name}'")
 
         except Exception as e:
             print("⚠ FAISS embedding failed:", e)
@@ -342,9 +352,7 @@ async def update_feedback_meta(
             new_landmark = current_landmark
 
         # Paths
-        old_path = os.path.join(
-            crud.LANDMARKS_DIR, current_landmark.name, img.filename
-        )
+        old_path = os.path.join(crud.LANDMARKS_DIR, current_landmark.name, img.filename)
         new_folder = crud.ensure_landmark_folder(new_landmark.name)
         new_path = os.path.join(new_folder, img.filename)
 
@@ -438,11 +446,7 @@ async def get_place_info(name: str, use_ai_summary: bool = False):
         if r.status_code == 200:
             data = r.json()
             desc = data.get("extract", "")
-            link = (
-                data.get("content_urls", {})
-                .get("desktop", {})
-                .get("page", "")
-            )
+            link = data.get("content_urls", {}).get("desktop", {}).get("page", "")
             summary = desc.split("\n")[0] if use_ai_summary else None
 
             return PlaceInfoResponse(
