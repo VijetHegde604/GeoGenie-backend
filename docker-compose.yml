@@ -1,7 +1,7 @@
 services:
     geogenie:
         container_name: geogenie-backend
-        image: geogenie:latest
+        image: vijethegde/geogenie:latest
         env_file: .env
         ports:
             - "9000:8000"
