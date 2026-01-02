@@ -213,3 +213,4 @@ backend/landmarks/*
 /scripts/test_augmented
 /scripts/landmarks
 /scripts/data
+/data
