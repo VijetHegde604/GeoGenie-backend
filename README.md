@@ -14,14 +14,14 @@ AI-powered React Native + Python app that identifies landmarks and monuments fro
 ## Project Structure
 
 ```
-geogenie/
-├── backend/          # FastAPI Python server
-    ├── main.py       # FastAPI app with endpoints
+GeoGenie-backend/
+    |                       # FastAPI Python server
+    ├── main.py             # FastAPI app with endpoints
     ├── embed_generator.py  # CLIP embedding extraction
-    ├── build_db.py   # Build reference embeddings database
+    ├── build_db.py         # Build reference embeddings database
     ├── search_image.py     # FAISS similarity search
     ├── exif_utils.py       # GPS metadata extraction
-    ├── geocode.py    # Reverse geocoding
+    ├── geocode.py          # Reverse geocoding
     └── requirements.txt
 
 ```
