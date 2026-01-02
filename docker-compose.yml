@@ -1,7 +1,9 @@
 services:
     geogenie:
         container_name: geogenie-backend
-        image: vijethegde/geogenie:latest
+        # Use 'vijethegde/geogenie:latest' for x86_64 (Linux Laptop/Desktop)
+        # Use 'vijethegde/geogenie:pi' for ARM64 (Raspberry Pi 5)
+        image: vijethegde/geogenie:pi
         env_file: .env
         ports:
             - "9000:8000"
