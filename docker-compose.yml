@@ -1,10 +1,11 @@
 services:
-  geogenie:
-    container_name: geogenie-backend
-    build: .
-    restart: always
-    env_file: .env
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./landmarks:/app/backend/landmarks
+    geogenie:
+        container_name: geogenie-backend
+        image: geogenie:latest
+        env_file: .env
+        ports:
+            - "9000:8000"
+        volumes:
+            - ./landmarks:/app/landmarks
+            - ./data:/app/data
+        restart: unless-stopped
