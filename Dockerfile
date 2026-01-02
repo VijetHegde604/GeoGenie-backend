@@ -8,11 +8,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install python dependencies
-COPY requirements-pi.txt .
+# Default to requirements.txt if nothing is provided
+# Used to find which environment its running ARM / AMD64 
+ARG REQ_FILE=requirements.txt
+COPY requirements.txt requirements-pi.txt ./
+
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements-pi.txt
+    pip install --no-cache-dir -r ${REQ_FILE}
 
 # Copy the pre-download script and run it
 COPY setup_model.py .
