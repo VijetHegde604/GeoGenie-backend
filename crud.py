@@ -30,7 +30,9 @@ def get_landmark_image(db: Session, image_id: int):
 
 
 def create_landmark(db: Session, name: str, description: str = None):
-    lm = Landmark(name=name, description=description)
+    # Always normalize the name to ensure consistency (Title_Case_With_Underscores)
+    normalized_name = normalize_name(name)
+    lm = Landmark(name=normalized_name, description=description)
     db.add(lm)
     db.commit()
     db.refresh(lm)
