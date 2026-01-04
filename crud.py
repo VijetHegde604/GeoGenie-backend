@@ -1,8 +1,11 @@
 import os
 import time
+
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from models import Landmark, LandmarkImage
-from models import User
+
+from models import Landmark, LandmarkImage, User
+from utils import normalize_name
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 LANDMARKS_DIR = os.path.join(BASE_DIR, "landmarks")
@@ -17,7 +20,8 @@ def get_landmark(db: Session, landmark_id: int):
 
 
 def get_landmark_by_name(db: Session, name: str):
-    return db.query(Landmark).filter(Landmark.name == name).first()
+    canon = normalize_name(name)
+    return db.query(Landmark).filter(func.lower(Landmark.name) == canon.lower()).first()
 
 
 # ✅ REQUIRED FOR feedback/meta
@@ -41,6 +45,7 @@ def ensure_landmark_folder(name: str):
 
 def save_landmark_image(db: Session, landmark: Landmark, filename: str):
     from uuid import uuid4
+
     image_uuid = str(uuid4())
     img = LandmarkImage(
         landmark_id=landmark.id, filename=filename, image_uuid=image_uuid
