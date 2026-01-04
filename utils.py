@@ -2,17 +2,21 @@ import os
 import shutil
 from datetime import datetime
 from typing import Tuple
+import re
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 
 def normalize_name(name: str) -> str:
-    """Normalize landmark name to TitleCase with underscores."""
+    """Normalize landmark name to Title_Case_With_Underscores."""
     if not name:
         return "Unknown"
 
-    words = name.strip().split()
-    return "_".join(w.capitalize() for w in words)
+    # Replace underscores with spaces, normalize spacing
+    cleaned = re.sub(r"[_\s]+", " ", name.strip())
+
+    # Title-case each word
+    return "_".join(word.capitalize() for word in cleaned.split())
 
 
 def ensure_folder(path: str):
