@@ -1,8 +1,8 @@
 services:
     geogenie:
         container_name: geogenie-backend
-        # Use 'vijethegde/geogenie:latest' for x86_64 (Linux Laptop/Desktop)
-        # Use 'vijethegde/geogenie:pi' for ARM64 (Raspberry Pi 5)
+        # Multiplatform image: automatically selects AMD64 or ARM64 based on your system
+        # Works on both x86_64 (Linux Laptop/Desktop) and ARM64 (Raspberry Pi 5)
         image: vijethegde/geogenie:latest
         env_file: .env
         ports:

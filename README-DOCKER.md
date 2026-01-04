@@ -14,18 +14,21 @@ This guide explains how to build Docker images for multiple platforms (AMD64/x86
 
 ## Quick Start
 
-### Build and Push Multiplatform Image
+### Build and Push Multiplatform Image (Single Tag)
 
 ```bash
-./build-docker.sh [IMAGE_NAME] [TAG]
+./build-docker.sh [IMAGE_NAME]
 ```
 
 Example:
 ```bash
-./build-docker.sh vijethegde/geogenie latest
+./build-docker.sh vijethegde/geogenie
 ```
 
-This will build for both `linux/amd64` and `linux/arm64` platforms and push to Docker Hub.
+This will build and push a **single multiplatform image**:
+- `vijethegde/geogenie:latest` contains **both** AMD64 and ARM64 architectures
+- Docker automatically selects the correct architecture when you pull/run
+- Use the same tag everywhere - no need to specify platform-specific tags!
 
 ### Build Locally for Current Platform (Faster)
 
@@ -70,28 +73,28 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 ### docker-compose.yml
 
-Update your `docker-compose.yml` to use the multiplatform image:
+Use the same image tag everywhere - Docker automatically selects the correct architecture:
 
 ```yaml
 services:
   geogenie:
-    image: vijethegde/geogenie:latest  # Works on both AMD64 and ARM64
+    image: vijethegde/geogenie:latest  # Works on both AMD64 and ARM64!
     # ... rest of config
 ```
 
-Docker will automatically pull the correct architecture-specific image for your platform.
+**No need to change the tag based on platform!** Docker will automatically pull the correct architecture-specific image.
 
 ### Manual Pull
 
 ```bash
 # On x86_64 system
-docker pull vijethegde/geogenie:latest
+docker pull vijethegde/geogenie:latest  # Pulls AMD64 version
 
 # On ARM64 system (Raspberry Pi 5)
-docker pull vijethegde/geogenie:latest
+docker pull vijethegde/geogenie:latest  # Pulls ARM64 version
 ```
 
-Docker automatically selects the correct architecture.
+Same command, different architectures automatically!
 
 ## Requirements Files
 
@@ -103,6 +106,22 @@ Docker automatically selects the correct architecture.
   - No NVIDIA packages
   - Unpinned faiss-cpu (allows compatible ARM builds)
   - PyTorch CPU-only builds
+
+## Understanding the Build Process
+
+When you build a multiplatform image, you'll see output like this:
+
+```
+[linux/amd64 2/9] RUN apt-get update...
+[linux/arm64 2/9] RUN apt-get update...
+```
+
+This is **normal and expected**. Docker Buildx builds each platform separately in parallel because:
+- Each architecture requires different binaries and dependencies
+- The builds are completely independent
+- Building in parallel is more efficient than sequential builds
+
+Each platform gets its own build process, and the final image manifest contains both architectures. When someone pulls the image, Docker automatically selects the correct architecture for their platform.
 
 ## Troubleshooting
 
