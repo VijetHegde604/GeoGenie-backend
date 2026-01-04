@@ -21,7 +21,13 @@ def get_landmark(db: Session, landmark_id: int):
 
 def get_landmark_by_name(db: Session, name: str):
     canon = normalize_name(name)
-    return db.query(Landmark).filter(func.lower(Landmark.name) == canon.lower()).first()
+    landmark = db.query(Landmark).filter(func.lower(Landmark.name) == canon.lower()).first()
+    # If found but name doesn't match exactly, update it to normalized version
+    if landmark and landmark.name != canon:
+        landmark.name = canon
+        db.commit()
+        db.refresh(landmark)
+    return landmark
 
 
 # ✅ REQUIRED FOR feedback/meta
