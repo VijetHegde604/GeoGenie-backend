@@ -344,10 +344,13 @@ async def update_feedback_meta(
         # Determine target landmark
         if landmark_name:
             norm = normalize_name(landmark_name)
+            print(f"🔍 Normalized '{landmark_name}' -> '{norm}'")
             new_landmark = crud.get_landmark_by_name(db, norm)
             if not new_landmark:
                 new_landmark = crud.create_landmark(db, norm, description)
                 print(f"🆕 Created landmark via /meta: {new_landmark.name}")
+            else:
+                print(f"📍 Using existing landmark: {new_landmark.name}")
         else:
             new_landmark = current_landmark
 
