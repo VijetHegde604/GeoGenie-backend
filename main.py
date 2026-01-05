@@ -258,7 +258,7 @@ async def upload_feedback(
             if not landmark:
                 raise HTTPException(404, "❌ Landmark not found")
         else:
-            norm = normalize_name(landmark_name) if landmark_name else "unknown"
+            norm = normalize_name(landmark_name) if landmark_name else "Unknown"
             landmark = crud.get_landmark_by_name(db, norm)
             if not landmark:
                 landmark = crud.create_landmark(db, norm, description)
@@ -287,7 +287,7 @@ async def upload_feedback(
         # Update FAISS
         # ---------------------------
         try:
-            if landmark.name == "unknown":
+            if landmark.name == "Unknown":
                 print("⏭ Skipping FAISS (unknown placeholder)")
             else:
                 embedder = get_embedder()

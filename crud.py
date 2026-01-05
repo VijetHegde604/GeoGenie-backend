@@ -24,6 +24,7 @@ def get_landmark_by_name(db: Session, name: str):
     landmark = db.query(Landmark).filter(func.lower(Landmark.name) == canon.lower()).first()
     # If found but name doesn't match exactly, update it to normalized version
     if landmark and landmark.name != canon:
+        print(f"🔧 get_landmark_by_name: Fixing casing '{landmark.name}' -> '{canon}'")
         landmark.name = canon
         db.commit()
         db.refresh(landmark)
@@ -38,10 +39,13 @@ def get_landmark_image(db: Session, image_id: int):
 def create_landmark(db: Session, name: str, description: str = None):
     # Always normalize the name to ensure consistency (Title_Case_With_Underscores)
     normalized_name = normalize_name(name)
+    if name != normalized_name:
+        print(f"⚠️  create_landmark: Normalized '{name}' -> '{normalized_name}'")
     lm = Landmark(name=normalized_name, description=description)
     db.add(lm)
     db.commit()
     db.refresh(lm)
+    print(f"✅ create_landmark: Created landmark with name '{lm.name}'")
     return lm
 
 
