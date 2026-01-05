@@ -8,25 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# TARGETARCH is automatically set by Docker Buildx for multiplatform builds
-# Values: amd64, arm64, arm/v7, etc.
-ARG TARGETARCH
-ARG TARGETPLATFORM
+# Accept REQ_FILE as build arg (default to requirements.txt for amd64)
+ARG REQ_FILE=requirements.txt
 
-# Copy both requirements files
+# Copy only the needed requirements file (and both if you want, but better to copy selectively in build command)
 COPY requirements.txt requirements-pi.txt ./
 
-# Select requirements file based on architecture
-# For ARM64 (Raspberry Pi 5), use requirements-pi.txt
-# For AMD64/x86_64, use requirements.txt
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        REQ_FILE=requirements-pi.txt; \
-        echo "🔧 Building for ARM64 (Raspberry Pi) - using requirements-pi.txt"; \
-    else \
-        REQ_FILE=requirements.txt; \
-        echo "🔧 Building for AMD64/x86_64 - using requirements.txt"; \
-    fi && \
-    pip install --no-cache-dir --upgrade pip && \
+# Install torch CPU version (common for both)
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r ${REQ_FILE}
 
