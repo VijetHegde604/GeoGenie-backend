@@ -229,8 +229,8 @@ async def list_landmark_folders():
     entries = sorted(
         [d for d in os.listdir(base) if os.path.isdir(os.path.join(base, d))]
     )
-    if "unknown" not in entries:
-        entries.append("unknown")
+    if "Unknown" not in entries:
+        entries.append("Unknown")
 
     return {"landmarks": entries}
 
