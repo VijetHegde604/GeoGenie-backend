@@ -29,6 +29,7 @@ GeoGenie-backend/
 ## Quick Start
 
 ### Backend Setup
+**Frontend Code is at https://github.com/VijetHegde604/GeoGenie.git**
 
 1. **Navigate to backend directory:**
 ```bash
