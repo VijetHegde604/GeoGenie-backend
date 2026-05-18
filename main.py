@@ -136,7 +136,7 @@ async def recognize_landmark(
         # GPS if provided or from EXIF
         gps = (
             (latitude, longitude)
-            if latitude and longitude
+            if latitude is not None and longitude is not None
             else extract_gps_from_bytes(img_bytes)
         )
 
@@ -312,7 +312,7 @@ async def upload_feedback(
             "landmark_id": landmark.id,
             "image_id": img_record.id,
             "filename": filename,
-            "coordinates": [lat_val, lng_val] if (lat_val and lng_val) else None,
+            "coordinates": [lat_val, lng_val] if (lat_val is not None and lng_val is not None) else None,
         }
 
     except Exception as e:
