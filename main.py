@@ -125,12 +125,17 @@ async def debug_routes():
 # ---------------------------------------------------
 @app.post("/recognize", response_model=RecognitionResponse)
 async def recognize_landmark(
-    image: UploadFile = File(...),
+    image: Optional[UploadFile] = File(None),
+    file: Optional[UploadFile] = File(None),
     latitude: Optional[float] = Form(None),
     longitude: Optional[float] = Form(None),
 ):
     try:
-        img_bytes = await image.read()
+        upload = image or file
+        if upload is None:
+            raise HTTPException(422, "Missing upload file. Use multipart field 'image' or 'file'.")
+
+        img_bytes = await upload.read()
         img_pil = Image.open(io.BytesIO(img_bytes))
 
         # GPS if provided or from EXIF
@@ -173,6 +178,8 @@ async def recognize_landmark(
             coordinates=list(gps) if gps else None,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -246,10 +253,18 @@ async def upload_feedback(
     description: Optional[str] = Form(None),
     latitude: Optional[str] = Form(None),
     longitude: Optional[str] = Form(None),
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
     try:
+        # ---------------------------
+        # Resolve upload field + validate file
+        # ---------------------------
+        upload = file or image
+        if upload is None:
+            raise HTTPException(422, "Missing upload file. Use multipart field 'file' or 'image'.")
+
         # ---------------------------
         # Resolve or create landmark
         # ---------------------------
@@ -269,7 +284,7 @@ async def upload_feedback(
         # ---------------------------
         # ALWAYS save image
         # ---------------------------
-        filename, saved_path = crud.save_uploaded_file_to_landmark(landmark.name, file)
+        filename, saved_path = crud.save_uploaded_file_to_landmark(landmark.name, upload)
         img_record = crud.save_landmark_image(db, landmark, filename)
         print(f"💾 Saved image '{filename}' under '{landmark.name}'")
 
@@ -315,6 +330,8 @@ async def upload_feedback(
             "coordinates": [lat_val, lng_val] if (lat_val is not None and lng_val is not None) else None,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
