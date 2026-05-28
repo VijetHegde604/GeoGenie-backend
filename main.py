@@ -127,8 +127,8 @@ async def debug_routes():
 async def recognize_landmark(
     image: Optional[UploadFile] = File(None),
     file: Optional[UploadFile] = File(None),
-    latitude: Optional[float] = Form(None),
-    longitude: Optional[float] = Form(None),
+    latitude: Optional[str] = Form(None),
+    longitude: Optional[str] = Form(None),
 ):
     try:
         upload = image or file
@@ -139,9 +139,16 @@ async def recognize_landmark(
         img_pil = Image.open(io.BytesIO(img_bytes))
 
         # GPS if provided or from EXIF
+        try:
+            lat_val = float(latitude) if latitude not in (None, "", "null") else None
+            lng_val = float(longitude) if longitude not in (None, "", "null") else None
+        except Exception:
+            lat_val = None
+            lng_val = None
+
         gps = (
-            (latitude, longitude)
-            if latitude is not None and longitude is not None
+            (lat_val, lng_val)
+            if lat_val is not None and lng_val is not None
             else extract_gps_from_bytes(img_bytes)
         )
 
