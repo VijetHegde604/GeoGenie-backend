@@ -6,19 +6,22 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs { inherit system; };
         python = pkgs.python311;
-      in {
+      in
+      {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            python
-            python311Packages.pip
-            python311Packages.virtualenv
-            python311Packages.setuptools
-            python311Packages.wheel
+            python311
             libpq
             openssl
             zlib
@@ -34,12 +37,20 @@
             fi
             source "$VENV_DIR/bin/activate"
 
-            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.libpq pkgs.openssl pkgs.zlib ]}:$LD_LIBRARY_PATH"
+            export LD_LIBRARY_PATH="${
+              pkgs.lib.makeLibraryPath [
+                pkgs.stdenv.cc.cc.lib
+                pkgs.libpq
+                pkgs.openssl
+                pkgs.zlib
+              ]
+            }:$LD_LIBRARY_PATH"
             export PIP_DISABLE_PIP_VERSION_CHECK=1
 
             echo "GeoGenie dev shell ready."
             echo "Run: pip install -r requirements.txt"
           '';
         };
-      });
+      }
+    );
 }
